@@ -6,6 +6,7 @@
     state: "{{ apt_install_state | default('latest') }}"
     update_cache: true
     cache_valid_time: "{{ apt_update_cache_valid_time | default(3600) }}"
+  when: "ansible_os_family == 'Debian'"
   tags:
     - haproxy-repository-install-dependencies
 
@@ -13,7 +14,9 @@
   ansible.builtin.apt_repository:
     repo: "{{ haproxy_ppa }}"
     update_cache: true
-  when: haproxy_use_ppa | bool
+  when:
+    - haproxy_use_ppa | bool
+    - "ansible_os_family == 'Debian'"
   tags:
     - haproxy-install-add-repository
 
@@ -22,6 +25,7 @@
     name: "{{ item.name }}"
     state: "{{ item.state }}"
   with_items: "{{ haproxy_dependencies }}"
+  when: "ansible_os_family == 'Debian'"
   tags:
     - haproxy-install-dependencies
 
@@ -29,5 +33,33 @@
   ansible.builtin.apt:
     name: "{{ haproxy_install }}"
     state: "{{ apt_install_state | default('latest') }}"
+  when: "ansible_os_family == 'Debian'"
   tags:
     - haproxy-install-additional
+
+- name: install haproxy (RHEL)
+  dnf:
+    name: "{{ item.name }}"
+    state: "{{ item.state }}"
+  with_items: "{{ haproxy_dependencies }}"
+  when: "ansible_os_family == 'RedHat'"
+  tags:
+    - haproxy-install-dependencies
+
+- name: install | additional (RHEL)
+  dnf:
+    name: "{{ haproxy_install }}"
+    state: "{{ apt_install_state | default('latest') }}"
+  when: "ansible_os_family == 'RedHat'"
+  tags:
+    - haproxy-install-additional
+
+# RH package doesn't create the /etc/haproxy/errors dir
+- name: Create symlink to /etc/haproxy/errors dir (RHEL)
+  ansible.builtin.file:
+    src: /usr/share/haproxy
+    dest: /etc/haproxy/errors
+    state: link
+  when: "ansible_os_family == 'RedHat'"
+  tags:
+    - haproxy-install-dependencies
